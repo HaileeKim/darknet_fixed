@@ -26,6 +26,7 @@
 #include <opencv2/core/types.hpp>
 #include <opencv2/videoio/videoio.hpp>
 #include <opencv2/imgcodecs/imgcodecs.hpp>
+#include <opencv2/imgproc/imgproc_c.h>
 #endif
 
 // OpenCV includes for OpenCV 2.x
@@ -454,23 +455,38 @@ static float get_pixel(image m, int x, int y, int c)
 }
 // ----------------------------------------
 
-extern "C" void show_image_cv(image p, const char *name)
-{
-    try {
-        image copy = copy_image(p);
-        constrain_image(copy);
 
-        cv::Mat mat = image_to_mat(copy);
-        if (mat.channels() == 3) cv::cvtColor(mat, mat, cv::COLOR_RGB2BGR);
-        else if (mat.channels() == 4) cv::cvtColor(mat, mat, cv::COLOR_RGBA2BGR);
-        cv::namedWindow(name, cv::WINDOW_NORMAL);
-        cv::imshow(name, mat);
-        free_image(copy);
+    extern "C" int show_image_cv(image p, const char *name)
+    {
+//        cv::Mat m = image_to_mat(p);
+//        cv::imshow(name, m);
+//        int c = cv::waitKey(1);
+//        if (c != -1) c = c%256;
+        double waitkey_start;
+        extern double b_disp;
+
+        try {
+            image copy = copy_image(p);
+            constrain_image(copy);
+
+            cv::Mat mat = image_to_mat(copy);
+            if (mat.channels() == 3) cv::cvtColor(mat, mat, cv::COLOR_RGB2BGR);
+            else if (mat.channels() == 4) cv::cvtColor(mat, mat, cv::COLOR_RGBA2BGR);
+            cv::namedWindow(name, cv::WINDOW_NORMAL);
+            cv::imshow(name, mat);
+            waitkey_start = get_time_in_ms();
+            int c = cv::waitKey(1);
+            b_disp = get_time_in_ms() - waitkey_start;
+
+            free_image(copy);
+
+            return c;
+        }
+        catch (...) {
+            cerr << "OpenCV exception: show_image_cv \n";
+        }
+        return 1;
     }
-    catch (...) {
-        cerr << "OpenCV exception: show_image_cv \n";
-    }
-}
 // ----------------------------------------
 
 /*
@@ -648,6 +664,35 @@ extern "C" mat_cv* get_capture_frame_cv(cap_cv *cap) {
 }
 // ----------------------------------------
 
+    extern "C" mat_cv* get_capture_frame_cv_with_timestamp(cap_cv *cap, struct frame_data *f) {
+        cv::Mat *mat = NULL;
+        try {
+            mat = new cv::Mat();
+            if (cap) {
+                cv::VideoCapture &cpp_cap = *(cv::VideoCapture *)cap;
+                if (cpp_cap.isOpened())
+                {
+                    cpp_cap >> *mat;
+
+                    f->frame_timestamp = cpp_cap.get(cv::CAP_PROP_POS_MSEC);
+                    f->frame_sequence = cpp_cap.get(cv::CAP_PROP_POS_FRAMES);
+#ifndef V4L2
+                    //f->select = cpp_cap.get(cv::CAP_PROP_SELECT);
+#endif
+                }
+                else std::cout << " Video-stream stopped! \n";
+            }
+            else cerr << " cv::VideoCapture isn't created \n";
+
+
+        }
+        catch (...) {
+            std::cout << " OpenCV exception: Video-stream stoped! \n";
+        }
+
+        return (mat_cv *)mat;
+    }
+    // ----------------------------------------
 extern "C" int get_stream_fps_cpp_cv(cap_cv *cap)
 {
     int fps = 25;
@@ -811,6 +856,38 @@ extern "C" image get_image_from_stream_resize(cap_cv *cap, int w, int h, int c, 
 }
 // ----------------------------------------
 
+    extern "C" image get_image_from_stream_resize_with_timestamp(cap_cv *cap, int w, int h, int c, mat_cv** in_img, int dont_close, struct frame_data *f)
+    {
+        c = c ? c : 3;
+        cv::Mat *src = NULL;
+
+        static int once = 1;
+        if (once) {
+            once = 0;
+            do {
+                if (src) delete src;
+                src = (cv::Mat*)get_capture_frame_cv_with_timestamp(cap,f);
+                if (!src) return make_empty_image(0, 0, 0);
+            } while (src->cols < 1 || src->rows < 1 || src->channels() < 1);
+            printf("Video stream: %d x %d \n", src->cols, src->rows);
+        }
+        else
+            //src = (cv::Mat*)get_capture_frame_cv(cap);
+            src = (cv::Mat*)get_capture_frame_cv_with_timestamp(cap, f);
+
+        *(cv::Mat **)in_img = src;
+
+        cv::Mat new_img = cv::Mat(h, w, CV_8UC(c));
+        cv::resize(*src, new_img, new_img.size(), 0, 0, cv::INTER_LINEAR);
+        if (c>1) cv::cvtColor(new_img, new_img, cv::COLOR_RGB2BGR);
+        image im = mat_to_image(new_img);
+
+        //show_image_cv(im, "im");
+        //show_image_mat(*in_img, "in_img");
+        return im;
+    }
+
+    // ----------------------------------------
 extern "C" image get_image_from_stream_letterbox(cap_cv *cap, int w, int h, int c, mat_cv** in_img, int dont_close)
 {
     c = c ? c : 3;

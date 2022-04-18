@@ -352,6 +352,11 @@ void run_yolo(int argc, char **argv)
     int cam_index = find_int_arg(argc, argv, "-c", 0);
     int frame_skip = find_int_arg(argc, argv, "-s", 0);
 	int ext_output = find_arg(argc, argv, "-ext_output");
+
+	int w = find_int_arg(argc, argv, "-w", 640);
+	int h = find_int_arg(argc, argv, "-h", 480);
+	int fps = find_int_arg(argc, argv, "-fps", 30);
+
     if(argc < 4){
         fprintf(stderr, "usage: %s %s [train/test/valid] [cfg] [weights (optional)]\n", argv[0], argv[1]);
         return;
@@ -365,5 +370,5 @@ void run_yolo(int argc, char **argv)
     else if(0==strcmp(argv[2], "valid")) validate_yolo(cfg, weights);
     else if(0==strcmp(argv[2], "recall")) validate_yolo_recall(cfg, weights);
     else if(0==strcmp(argv[2], "demo")) demo(cfg, weights, thresh, hier_thresh, cam_index, filename, voc_names, 20, 1, frame_skip,
-		prefix, out_filename, mjpeg_port, 0, json_port, dont_show, ext_output, 0, 0, 0, 0, 0);
+		prefix, out_filename, mjpeg_port, 0, json_port, dont_show, ext_output, 0, 0, 0, 0, 0, w, h, fps);
 }

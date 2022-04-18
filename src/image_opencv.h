@@ -7,7 +7,6 @@
 #ifdef __cplusplus
 extern "C" {
 #endif
-
 #ifdef OPENCV
 
 // declaration
@@ -53,7 +52,7 @@ void destroy_all_windows_cv();
 int wait_key_cv(int delay);
 int wait_until_press_key_cv();
 void make_window(char *name, int w, int h, int fullscreen);
-void show_image_cv(image p, const char *name);
+int show_image_cv(image p, const char *name);
 //void show_image_cv_ipl(mat_cv *disp, const char *name);
 void show_image_mat(mat_cv *mat_ptr, const char *name);
 
@@ -74,6 +73,7 @@ cap_cv* get_capture_webcam(int index);
 void release_capture(cap_cv* cap);
 
 mat_cv* get_capture_frame_cv(cap_cv *cap);
+mat_cv* get_capture_frame_cv_with_timestamp(cap_cv *cap, struct frame_data *f); 
 int get_stream_fps_cpp_cv(cap_cv *cap);
 double get_capture_property_cv(cap_cv *cap, int property_id);
 double get_capture_frame_count_cv(cap_cv *cap);
@@ -83,6 +83,7 @@ int set_capture_position_frame_cv(cap_cv *cap, int index);
 // ... Video Capture
 image get_image_from_stream_cpp(cap_cv *cap);
 image get_image_from_stream_resize(cap_cv *cap, int w, int h, int c, mat_cv** in_img, int dont_close);
+image get_image_from_stream_resize_with_timestamp(cap_cv *cap, int w, int h, int c, mat_cv** in_img, int dont_close, struct frame_data *f);
 image get_image_from_stream_letterbox(cap_cv *cap, int w, int h, int c, mat_cv** in_img, int dont_close);
 void consume_frame(cap_cv *cap);
 
