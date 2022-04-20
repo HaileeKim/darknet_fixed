@@ -87,7 +87,7 @@ CFLAGS+= -DMEASUREMENT
 endif
 
 ifeq ($(V4L2), 1)
-CFGLAGS+= -DV4L2
+CFLAGS+= -DV4L2
 LDFLAGS+= -lv4l2
 endif
 

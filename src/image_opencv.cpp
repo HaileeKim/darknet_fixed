@@ -1,5 +1,6 @@
 #include "image_opencv.h"
 #include <iostream>
+#include "v4l2.h"
 
 #ifdef OPENCV
 #include "utils.h"
@@ -616,13 +617,30 @@ extern "C" cap_cv* get_capture_video_stream(const char *path) {
 }
 // ----------------------------------------
 
+    extern "C" cap_cv* get_capture_webcam_with_prop(int index, int w, int h, int fps)
+    {
+        cv::VideoCapture* cap = NULL;
+        try {
+            cap = new cv::VideoCapture(index);
+	        cap->set(cv::CAP_PROP_FRAME_WIDTH, w);
+			cap->set(cv::CAP_PROP_FRAME_HEIGHT, h);
+			//cap->set(cv::CAP_PROP_FRAME_FPS, fps);
+        }
+        catch (...) {
+            cerr << " OpenCV exception: Web-camera " << index << " can't be opened! \n";
+        }
+        return (cap_cv*)cap;
+    }
+
+// ----------------------------------------
+
 extern "C" cap_cv* get_capture_webcam(int index)
 {
     cv::VideoCapture* cap = NULL;
     try {
         cap = new cv::VideoCapture(index);
-        //cap->set(CV_CAP_PROP_FRAME_WIDTH, 1280);
-        //cap->set(CV_CAP_PROP_FRAME_HEIGHT, 960);
+        cap->set(cv::CAP_PROP_FRAME_WIDTH, 640);
+        cap->set(cv::CAP_PROP_FRAME_HEIGHT, 480);
     }
     catch (...) {
         cerr << " OpenCV exception: Web-camera " << index << " can't be opened! \n";
@@ -866,6 +884,7 @@ extern "C" image get_image_from_stream_resize(cap_cv *cap, int w, int h, int c, 
             once = 0;
             do {
                 if (src) delete src;
+                //src = (cv::Mat*)get_capture_frame_cv(cap);
                 src = (cv::Mat*)get_capture_frame_cv_with_timestamp(cap,f);
                 if (!src) return make_empty_image(0, 0, 0);
             } while (src->cols < 1 || src->rows < 1 || src->channels() < 1);
@@ -980,6 +999,9 @@ extern "C" void draw_detections_cv_v3(mat_cv* mat, detection *dets, int num, flo
         if (!show_img) return;
         static int frame_id = 0;
         frame_id++;
+	extern int num_object;
+	extern int display_index;
+	int k = 0;
 
         for (i = 0; i < num; ++i) {
             char labelstr[4096] = { 0 };
@@ -987,7 +1009,8 @@ extern "C" void draw_detections_cv_v3(mat_cv* mat, detection *dets, int num, flo
             for (j = 0; j < classes; ++j) {
                 int show = strncmp(names[j], "dont_show", 9);
                 if (dets[i].prob[j] > thresh && show) {
-                    if (class_id < 0) {
+                   k++;
+		   if (class_id < 0) {
                         strcat(labelstr, names[j]);
                         class_id = j;
                         char buff[20];
@@ -1104,6 +1127,9 @@ extern "C" void draw_detections_cv_v3(mat_cv* mat, detection *dets, int num, flo
                 // cv::FONT_HERSHEY_COMPLEX_SMALL, cv::FONT_HERSHEY_SIMPLEX
             }
         }
+
+	num_object = k;
+
         if (ext_output) {
             fflush(stdout);
         }
