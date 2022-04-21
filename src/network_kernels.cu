@@ -38,6 +38,8 @@
 
 #include "http_stream.h"
 
+double gpu_kernel_start;
+
 float * get_network_output_gpu_layer(network net, int i);
 float * get_network_delta_gpu_layer(network net, int i);
 float * get_network_output_gpu(network net);
@@ -59,6 +61,8 @@ int time_comparator(const void *pa, const void *pb)
 
 void forward_network_gpu(network net, network_state state)
 {
+    extern double e_infer_gpu;
+    
     static time_benchmark_layers *avg_time_per_layer = NULL;
     static time_benchmark_layers *sorted_avg_time_per_layer = NULL;
     double start_time, end_time;
@@ -73,6 +77,8 @@ void forward_network_gpu(network net, network_state state)
     //printf("\n");
     state.workspace = net.workspace;
     int i;
+    gpu_kernel_start = get_time_in_ms();
+    //printf("gpu start : %d \n", gpu_kernel_start); 
     for(i = 0; i < net.n; ++i){
         state.index = i;
         layer l = net.layers[i];
@@ -134,6 +140,8 @@ void forward_network_gpu(network net, network_state state)
             cvDestroyAllWindows();
         }
 */
+
+        if(l.type == REGION) e_infer_gpu = get_time_in_ms() - gpu_kernel_start;
     }
 
     if (net.benchmark_layers) {
@@ -679,7 +687,16 @@ float train_networks(network *nets, int n, data d, int interval)
 float *get_network_output_layer_gpu(network net, int i)
 {
     layer l = net.layers[i];
-    if(l.type != REGION && l.type != YOLO && (*net.cuda_graph_ready) == 0) cuda_pull_array(l.output_gpu, l.output, l.outputs*l.batch);
+    //printf("get network_output_gpu layer ==============\n");
+    //if(l.type != REGION && l.type != YOLO && (*net.cuda_graph_ready) == 0)
+    if(l.type != REGION)
+    {
+        extern double e_infer_gpu;
+        //printf("get network_output_gpu layer ==============\n");
+        cuda_pull_array(l.output_gpu, l.output, l.outputs*l.batch);
+        e_infer_gpu = get_time_in_ms() - gpu_kernel_start;
+        //printf("e_infer_gpu : %d \n", e_infer_gpu);
+    }
     return l.output;
 }
 
@@ -687,7 +704,9 @@ float *get_network_output_gpu(network net)
 {
     int i;
     for(i = net.n-1; i > 0; --i) if(net.layers[i].type != COST) break;
+    printf("get network_output_gpu \n");
     return get_network_output_layer_gpu(net, i);
+    
 }
 
 float *network_predict_gpu(network net, float *input)
@@ -698,6 +717,7 @@ float *network_predict_gpu(network net, float *input)
     network_state state;
     state.index = 0;
     state.net = net;
+    //printf("network_predict_gpu"\n);
     //state.input = cuda_make_array(input, size);   // memory will be allocated in the parse_network_cfg_custom()
     state.input = net.input_state_gpu;
     memcpy(net.input_pinned_cpu, input, size * sizeof(float));

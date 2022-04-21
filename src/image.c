@@ -330,6 +330,8 @@ void draw_detections_v3(image im, detection *dets, int num, float thresh, char *
 {
     static int frame_id = 0;
     frame_id++;
+    
+    extern int num_object;
 
     int selected_detections_num;
     detection_with_class* selected_detections = get_actual_detections(dets, num, thresh, &selected_detections_num, names);
@@ -337,6 +339,7 @@ void draw_detections_v3(image im, detection *dets, int num, float thresh, char *
     // text output
     qsort(selected_detections, selected_detections_num, sizeof(*selected_detections), compare_by_lefts);
     int i;
+    num_object = selected_detections_num;
     for (i = 0; i < selected_detections_num; ++i) {
         const int best_class = selected_detections[i].best_class;
         printf("%s: %.0f%%", names[best_class],    selected_detections[i].det.prob[best_class] * 100);

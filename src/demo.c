@@ -96,7 +96,7 @@ extern double e_fetch_sum = 0;
 extern double b_fetch_sum = 0;
 extern double d_fetch_sum = 0;
 extern double e_infer_cpu_sum = 0;
-extern double e_infer_gpu_sum = 0;
+extern double e_infer_gpu_sum = 5;
 extern double d_infer_sum = 0;
 extern double e_disp_sum = 0;
 extern double b_disp_sum = 0;
@@ -105,7 +105,7 @@ extern double slack_sum = 0;
 extern double e2e_delay_sum = 0;
 extern double fps_sum = 0;
 extern double cycle_time_sum = 0;
-//extern double inter_frame_gap_sum = 0;
+extern double inter_frame_gap_sum = 0;
 extern double num_object_sum = 0;
 extern double trace_data_sum = 0;
 
@@ -153,7 +153,7 @@ int write_result(void)
 
     fprintf(fp, "%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s\n", "e_fetch", "b_fetch", "d_fetch",
             "e_infer", "b_infer", "d_infer", "e_disp", "b_disp", "d_disp",
-            "e2e_delay", "fps", "c_sys", "n_obj");
+            "slack", "e2e_delay", "fps", "c_sys", "IFG", "n_obj");
 
     for(int i=0;i<OBJ_DET_CYCLE_IDX;i++)
     {
@@ -166,16 +166,16 @@ int write_result(void)
         e_disp_sum += e_disp_array[i];
         b_disp_sum += b_disp_array[i];
         d_disp_sum += d_disp_array[i];
-        //slack_sum += slack[i];
+        slack_sum += slack[i];
         e2e_delay_sum += e2e_delay[i];
         fps_sum += fps_array[i];
         cycle_time_sum += cycle_time_array[i];
-        //inter_frame_gap_sum += (double)inter_frame_gap_array[i];
+        inter_frame_gap_sum += (double)inter_frame_gap_array[i];
         num_object_sum += (double)num_object_array[i];
 
         fprintf(fp, "%0.2f,%0.2f,%0.2f,%0.2f,%0.2f,%0.2f,%0.2f,%0.2f,%0.2f,%0.2f,%0.2f,%0.2f,%0.2f,%d,%d\n", e_fetch_array[i], b_fetch_array[i],d_fetch_array[i], 
                 e_infer_cpu_array[i], e_infer_gpu_array[i], d_infer_array[i], e_disp_array[i], b_disp_array[i], d_disp_array[i], 
-                e2e_delay[i], fps_array[i], cycle_time_array[i], num_object_array[i]);
+                slack[i], e2e_delay[i], fps_array[i], cycle_time_array[i], inter_frame_gap_array[i], num_object_array[i]);
     }
     fclose(fp);
 
@@ -188,7 +188,7 @@ void push_data(void)
     e_fetch_array[cnt - CYCLE_OFFSET] = d_fetch - b_fetch - fetch_offset;
     //e_fetch_array[cnt - CYCLE_OFFSET] = d_fetch - b_fetch - fetch_offset;
     d_fetch_array[cnt - CYCLE_OFFSET] = d_fetch;
-    //inter_frame_gap_array[cnt - CYCLE_OFFSET] = inter_frame_gap;
+    inter_frame_gap_array[cnt - CYCLE_OFFSET] = inter_frame_gap;
     transfer_delay_array[cnt - CYCLE_OFFSET] = transfer_delay;
 
     e_infer_cpu_array[cnt - CYCLE_OFFSET] = d_infer - e_infer_gpu;
@@ -207,7 +207,7 @@ void push_data(void)
     e_disp_array[cnt - CYCLE_OFFSET] = d_disp - b_disp;
     b_disp_array[cnt - CYCLE_OFFSET] = b_disp;
     d_disp_array[cnt - CYCLE_OFFSET] = d_disp;
-    //slack[cnt - CYCLE_OFFSET] = slack_time;
+    slack[cnt - CYCLE_OFFSET] = slack_time;
     num_object_array[cnt - CYCLE_OFFSET] = num_object;
 
     //printf("num_object : %d\n", num_object);
@@ -277,7 +277,10 @@ void *fetch_in_thread(void *ptr)
             //in_s = resize_image(in, net.w, net.h);
 
             custom_atomic_store_int(&run_fetch_in_thread, 0);
+
             end_fetch = get_time_in_ms();
+
+   		    inter_frame_gap = GET_IFG(frame[buff_index].frame_sequence, frame_sequence_tmp);
 
             if(cnt >= (CYCLE_OFFSET - 5))
             {
@@ -285,9 +288,11 @@ void *fetch_in_thread(void *ptr)
                 b_fetch = frame[buff_index].select;
                 e_fetch = d_fetch - b_fetch - fetch_offset;
             }   
-        }
 
-    /*
+        }
+    }
+
+     /*   
     end_fetch = get_time_in_ms();
     
     if(cnt >= (CYCLE_OFFSET - 5))
@@ -297,7 +302,6 @@ void *fetch_in_thread(void *ptr)
         e_fetch = d_fetch - b_fetch - fetch_offset;
     }
     */
-    }
     return 0;
 }
 
@@ -313,11 +317,13 @@ void *detect_in_thread(void *ptr)
     //start_infer = get_time_in_ms();
     while (!custom_atomic_load_int(&flag_exit)) {
         while (!custom_atomic_load_int(&run_detect_in_thread)) {
+            //start_infer = get_time_in_ms();
             if (custom_atomic_load_int(&flag_exit)) return 0;
             this_thread_yield();
         }
 
         start_infer = get_time_in_ms();
+
         layer l = net.layers[net.n - 1];
 #ifdef V4L2
         float *X = frame[detect_index].resize_frame.data;
@@ -326,7 +332,7 @@ void *detect_in_thread(void *ptr)
 #endif
         //float *prediction =
         network_predict(net, X);
-
+	
         cv_images[demo_index] = det_img;
         det_img = cv_images[(demo_index + avg_frames / 2 + 1) % avg_frames];
         demo_index = (demo_index + 1) % avg_frames;
@@ -359,11 +365,12 @@ void *detect_in_thread(void *ptr)
 
         d_infer = end_infer - start_infer;
     }
+/*
+    end_infer = get_time_in_ms();
 
-    //end_infer = get_time_in_ms();
-
-    //d_infer = end_infer - start_infer;
+    d_infer = end_infer - start_infer;
     return 0;
+*/
 }
 
 void *detect_in_thread_sync(void *ptr)
@@ -750,10 +757,10 @@ void demo(char *cfgfile, char *weightfile, float thresh, float hier_thresh, int 
     printf("Avg disp execution time (ms) : %0.2f\n", e_disp_sum / OBJ_DET_CYCLE_IDX);
     printf("Avg disp blocking time (ms) : %0.2f\n", b_disp_sum / OBJ_DET_CYCLE_IDX);
     printf("Avg disp delay (ms) : %0.2f\n", d_disp_sum / OBJ_DET_CYCLE_IDX);
-    //printf("Avg salck (ms) : %0.2f\n", slack_sum / OBJ_DET_CYCLE_IDX);
+    printf("Avg salck (ms) : %0.2f\n", slack_sum / OBJ_DET_CYCLE_IDX);
     printf("Avg E2E delay (ms) : %0.2f\n", e2e_delay_sum / OBJ_DET_CYCLE_IDX);
     printf("Avg cycle time (ms) : %0.2f\n", cycle_time_sum / OBJ_DET_CYCLE_IDX);
-    //printf("Avg inter frame gap : %0.2f\n", inter_frame_gap_sum / OBJ_DET_CYCLE_IDX);
+    printf("Avg inter frame gap : %0.2f\n", inter_frame_gap_sum / OBJ_DET_CYCLE_IDX);
     printf("Avg number of object : %0.2f\n", num_object_sum / OBJ_DET_CYCLE_IDX);
     printf("=====================================\n");
 #endif

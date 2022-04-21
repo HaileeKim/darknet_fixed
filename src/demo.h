@@ -14,6 +14,12 @@
 #define QLEN 4
 #define NFRAMES 3
 
+#define MAX(x,y) (((x) < (y) ? (y) : (x)))
+#define MIN(x,y) (((x) < (y) ? (x) : (y)))
+/* calculate inter frame gap */
+#define GET_IFG(x,y) ((x) - (y)); \
+    (y) = (x);
+
 #ifdef __cplusplus
 extern "C" {
 #endif
