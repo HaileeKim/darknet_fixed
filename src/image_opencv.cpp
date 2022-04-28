@@ -687,13 +687,16 @@ extern "C" mat_cv* get_capture_frame_cv(cap_cv *cap) {
         try {
             mat = new cv::Mat();
             if (cap) {
+		double get_image = get_time_in_ms();
                 cv::VideoCapture &cpp_cap = *(cv::VideoCapture *)cap;
+		//get_image = get_time_in_ms();
                 if (cpp_cap.isOpened())
                 {
                     cpp_cap >> *mat;
 
-                    f->frame_timestamp = cpp_cap.get(cv::CAP_PROP_POS_MSEC);
-                    f->frame_sequence = cpp_cap.get(cv::CAP_PROP_POS_FRAMES);
+                    //f->frame_timestamp = cpp_cap.get(cv::CAP_PROP_POS_MSEC);
+                    f->frame_timestamp = get_image;
+		    f->frame_sequence = cpp_cap.get(cv::CAP_PROP_POS_FRAMES);
 #ifndef V4L2
                     //f->select = cpp_cap.get(cv::CAP_PROP_SELECT);
 #endif

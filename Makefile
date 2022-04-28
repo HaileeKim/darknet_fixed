@@ -8,7 +8,7 @@ LIBSO=0
 ZED_CAMERA=0
 ZED_CAMERA_v2_8=0
 MEASUREMENT=1
-V4L2=1
+V4L2=0
 
 # set GPU=1 and CUDNN=1 to speedup on GPU
 # set CUDNN_HALF=1 to further speedup 3 x times (Mixed-precision on Tensor Cores) GPU: Volta, Xavier, Turing and higher
